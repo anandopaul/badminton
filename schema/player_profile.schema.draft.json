@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Badminton NOW player profile export",
+  "description": "Normalized profiles for every unique player ID with a ranking record in the collected region 19 season JSON files. Entity metadata is stored once and appearances reference season, group, poule, and team entities by ID.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "scope",
+    "seasons",
+    "groups",
+    "teams",
+    "poules",
+    "players"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "seasons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/season"
+      }
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/group"
+      }
+    },
+    "teams": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/team"
+      }
+    },
+    "poules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/poule"
+      }
+    },
+    "players": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/player"
+      }
+    }
+  },
+  "$defs": {
+    "nullableInteger": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "nullableNumber": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "nullableBoolean": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "region",
+        "history_range",
+        "player_population"
+      ],
+      "properties": {
+        "region": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "region_id",
+            "name"
+          ],
+          "properties": {
+            "region_id": {
+              "type": "integer",
+              "const": 19
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "history_range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "from_season_id",
+            "through_season_id"
+          ],
+          "properties": {
+            "from_season_id": {
+              "type": "string"
+            },
+            "through_season_id": {
+              "type": "string"
+            }
+          }
+        },
+        "player_population": {
+          "const": "all_unique_player_ids_with_a_ranking_record_included_seasons"
+        }
+      }
+    },
+    "season": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "season_id",
+        "name",
+        "year",
+        "retrieved_at",
+        "source_file"
+      ],
+      "properties": {
+        "season_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 2019,
+          "maximum": 2026
+        },
+        "retrieved_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_file": {
+          "type": "string"
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "name"
+      ],
+      "properties": {
+        "group_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "team": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "team_id",
+        "name"
+      ],
+      "properties": {
+        "team_id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "poule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "poule_id",
+        "season_id",
+        "group_id",
+        "class",
+        "source",
+        "team_ids"
+      ],
+      "properties": {
+        "poule_id": {
+          "type": "integer"
+        },
+        "season_id": {
+          "type": "string"
+        },
+        "group_id": {
+          "type": "string"
+        },
+        "class": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "source": {
+          "type": "string",
+          "format": "uri"
+        },
+        "team_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "rankingSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "played",
+        "wins",
+        "win_pct",
+        "rating",
+        "prev_rating",
+        "anonymous",
+        "substitute",
+        "own_team"
+      ],
+      "properties": {
+        "played": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "wins": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "win_pct": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "rating": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "prev_rating": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "anonymous": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "substitute": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "own_team": {
+          "$ref": "#/$defs/nullableBoolean"
+        }
+      }
+    },
+    "appearance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "poule_id",
+        "team_id",
+        "ranking"
+      ],
+      "properties": {
+        "poule_id": {
+          "type": "integer"
+        },
+        "team_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "ranking": {
+          "$ref": "#/$defs/rankingSnapshot"
+        }
+      }
+    },
+    "groupHistory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "appearances"
+      ],
+      "properties": {
+        "group_id": {
+          "type": "string"
+        },
+        "appearances": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/appearance"
+          }
+        }
+      }
+    },
+    "player": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "player_id",
+        "full_name",
+        "name_aliases",
+        "group_history"
+      ],
+      "properties": {
+        "player_id": {
+          "type": "integer",
+          "description": "Stable Badminton NOW player ID. One profile exists per unique ID."
+        },
+        "full_name": {
+          "type": "string"
+        },
+        "name_aliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "Distinct historical names only; the preferred full_name is not repeated here."
+        },
+        "group_history": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/groupHistory"
+          },
+          "description": "All group appearances for this player. Season, class, and team names are resolved through poule, season, and team references."
+        }
+      }
+    }
+  }
+}

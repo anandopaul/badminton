@@ -1,0 +1,513 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Badminton NOW season export (draft)",
+  "description": "Draft schema for region 19 season exports. Match-detail properties are provisional because their endpoint has not been identified.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "retrieved_at",
+    "source",
+    "region",
+    "season",
+    "poules"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "retrieved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "string",
+      "format": "uri"
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "region_id",
+        "name"
+      ],
+      "properties": {
+        "region_id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "season": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "year"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 2019,
+          "maximum": 2026
+        }
+      }
+    },
+    "poules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/poule"
+      }
+    }
+  },
+  "$defs": {
+    "nullableInteger": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "nullableNumber": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "nullableBoolean": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "teamReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "team_id",
+        "name"
+      ],
+      "properties": {
+        "team_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "name": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "team": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "team_id",
+        "name"
+      ],
+      "properties": {
+        "team_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "name": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "match_id",
+        "match_number",
+        "play_time",
+        "team1",
+        "team2",
+        "score1",
+        "score2",
+        "num_sets",
+        "status",
+        "canceled",
+        "postponed",
+        "remark",
+        "location_id",
+        "match_type_id",
+        "has_issue",
+        "period"
+      ],
+      "properties": {
+        "match_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "match_number": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "play_time": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "team1": {
+          "$ref": "#/$defs/teamReference"
+        },
+        "team2": {
+          "$ref": "#/$defs/teamReference"
+        },
+        "score1": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "score2": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "num_sets": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "status": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ],
+          "description": "Website status value; meanings are not yet mapped."
+        },
+        "canceled": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "postponed": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "remark": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "location_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "match_type_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "has_issue": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "period": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "standing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "team_id",
+        "team_name",
+        "played",
+        "points",
+        "withdrawn",
+        "team_rating",
+        "start_points",
+        "unfinished_points"
+      ],
+      "properties": {
+        "team_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "team_name": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "played": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "points": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "withdrawn": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "team_rating": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "start_points": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "unfinished_points": {
+          "$ref": "#/$defs/nullableNumber"
+        }
+      }
+    },
+    "ranking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "player_id",
+        "full_name",
+        "team_id",
+        "team_name",
+        "played",
+        "wins",
+        "win_pct",
+        "rating",
+        "prev_rating",
+        "anonymous",
+        "substitute",
+        "own_team"
+      ],
+      "properties": {
+        "player_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "full_name": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "team_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "team_name": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "played": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "wins": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "win_pct": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "rating": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "prev_rating": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "anonymous": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "substitute": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "own_team": {
+          "$ref": "#/$defs/nullableBoolean"
+        }
+      }
+    },
+    "player": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "player_id",
+        "full_name"
+      ],
+      "properties": {
+        "player_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "full_name": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "setScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "set_number",
+        "score1",
+        "score2"
+      ],
+      "properties": {
+        "set_number": {
+          "type": "integer"
+        },
+        "score1": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "score2": {
+          "$ref": "#/$defs/nullableInteger"
+        }
+      }
+    },
+    "rubber": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rubber_order",
+        "discipline",
+        "side1_players",
+        "side2_players",
+        "sets",
+        "winner",
+        "status"
+      ],
+      "properties": {
+        "rubber_order": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "discipline": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "side1_players": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/player"
+          }
+        },
+        "side2_players": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/player"
+          }
+        },
+        "sets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/setScore"
+          }
+        },
+        "winner": {
+          "enum": [
+            "side1",
+            "side2",
+            null
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "matchDetail": {
+      "type": "object",
+      "description": "Provisional layout; the live sample has no match-detail records yet.",
+      "additionalProperties": false,
+      "required": [
+        "match_id",
+        "match_number",
+        "rubbers"
+      ],
+      "properties": {
+        "match_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "match_number": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "rubbers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rubber"
+          }
+        }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "match_id",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "match_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "poule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "poule",
+        "teams",
+        "matches",
+        "standings",
+        "rankings",
+        "match_details",
+        "warnings"
+      ],
+      "properties": {
+        "poule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "poule_id",
+            "season_name",
+            "competition",
+            "class",
+            "source"
+          ],
+          "properties": {
+            "poule_id": {
+              "type": "integer"
+            },
+            "season_name": {
+              "type": "string"
+            },
+            "competition": {
+              "$ref": "#/$defs/nullableString"
+            },
+            "class": {
+              "$ref": "#/$defs/nullableString"
+            },
+            "source": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "teams": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/team"
+          }
+        },
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/match"
+          }
+        },
+        "standings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/standing"
+          }
+        },
+        "rankings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ranking"
+          }
+        },
+        "match_details": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/matchDetail"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/warning"
+          }
+        }
+      }
+    }
+  }
+}
