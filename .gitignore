@@ -11,3 +11,16 @@ venv/
 
 # The handover contains copied competition/player examples.
 /Download the Badminton NOW data-retrieval handover.md
+
+# Local web application dependencies and build output.
+/web/node_modules/
+/web/dist/
+/web/coverage/
+/web/.vite/
+
+# Local Python chat backend environment and caches.
+/api/.venv/
+/api/.env
+/api/__pycache__/
+/api/tests/__pycache__/
+.pytest_cache/
