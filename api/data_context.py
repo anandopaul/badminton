@@ -27,6 +27,33 @@ def _normalize(value: str) -> str:
     return re.sub(r"\s+", " ", without_marks.casefold()).strip()
 
 
+def _season_years(normalized_text: str) -> set[int]:
+    return {
+        int(year)
+        for year in re.findall(r"(?<!\d)20\d{2}(?!\d)", normalized_text)
+    }
+
+
+def _season_phases(normalized_text: str) -> set[str]:
+    return {
+        phase
+        for phase in ("voorjaar", "najaar")
+        if re.search(rf"(?<![a-z0-9]){phase}(?![a-z0-9])", normalized_text)
+    }
+
+
+def _has_season_reference(normalized_text: str) -> bool:
+    return bool(_season_years(normalized_text) or _season_phases(normalized_text))
+
+
+def _asks_about_match_details(normalized_text: str) -> bool:
+    return re.search(
+        r"\b(?:matches?|matchups?|rubbers?|opponents?|fixtures?|against|versus|vs|"
+        r"play(?:ed|s|ing)?|beat|beaten|won|lost)\b",
+        normalized_text,
+    ) is not None
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -111,19 +138,55 @@ class JsonDataContext:
             )
         return cls(profile, season_documents)
 
-    def build(self, question: str, selected_player_id: int | None) -> RetrievedContext:
-        normalized_question = _normalize(question)
+    def build(
+        self,
+        question: str,
+        selected_player_id: int | None,
+        prior_user_questions: list[str] | None = None,
+    ) -> RetrievedContext:
+        prior_questions = (prior_user_questions or [])[-6:]
+        search_text = "\n".join([*prior_questions, question])
+        normalized_question = _normalize(search_text)
+        normalized_current_question = _normalize(question)
+        selection_question = question
+        if not _has_season_reference(normalized_current_question):
+            selection_context = next(
+                (
+                    prior
+                    for prior in reversed(prior_questions)
+                    if _has_season_reference(_normalize(prior))
+                    or re.search(
+                        r"\b(?:history|career|since|over time|trend|all seasons)\b",
+                        _normalize(prior),
+                    )
+                ),
+                None,
+            )
+            if selection_context:
+                selection_question = f"{selection_context}\n{question}"
+        normalized_selection = _normalize(selection_question)
+        match_details_query = _asks_about_match_details(normalized_question)
         matched_players = self._find_players(normalized_question, selected_player_id)
         sections: list[str] = []
         sources: list[str] = []
+        player_team_names: list[str] = []
 
         for player in matched_players[:3]:
-            section, player_sources = self._player_section(player, normalized_question)
+            section, player_sources, related_teams = self._player_section(
+                player,
+                normalized_selection,
+                include_match_detail_note=match_details_query,
+            )
             if section:
                 sections.append(section)
                 sources.extend(player_sources)
+                player_team_names.extend(related_teams)
 
-        team_sections, team_sources = self._team_sections(normalized_question)
+        team_sections, team_sources = self._team_sections(
+            normalized_question,
+            normalized_selection,
+            player_team_names if match_details_query else None,
+        )
         sections.extend(team_sections)
         sources.extend(team_sources)
 
@@ -176,7 +239,8 @@ class JsonDataContext:
         self,
         player: dict[str, Any],
         normalized_question: str,
-    ) -> tuple[str, list[str]]:
+        include_match_detail_note: bool = False,
+    ) -> tuple[str, list[str], list[str]]:
         player_id = player["player_id"]
         rows: list[dict[str, Any]] = []
         group_filter = next(
@@ -187,7 +251,8 @@ class JsonDataContext:
             ),
             None,
         )
-        year_matches = {int(year) for year in re.findall(r"\b20\d{2}\b", normalized_question)}
+        year_matches = _season_years(normalized_question)
+        season_phases = _season_phases(normalized_question)
         history_question = any(
             word in normalized_question
             for word in ("history", "career", "since", "over time", "trend", "all seasons")
@@ -204,6 +269,11 @@ class JsonDataContext:
                 season = self.seasons.get(poule.get("season_id"), {})
                 year = season.get("year")
                 if year_matches and year not in year_matches:
+                    continue
+                season_name = _normalize(season.get("name", ""))
+                if season_phases and not any(
+                    season_name.startswith(phase) for phase in season_phases
+                ):
                     continue
                 rows.append({
                     "season": season.get("name"),
@@ -223,13 +293,35 @@ class JsonDataContext:
                 row.get("poule_id") or 0,
             )
         )
-        if not history_question and not year_matches:
+        if year_matches and not history_question and not season_phases and rows:
+            latest_seasons_by_year: dict[int, tuple[int, int]] = {}
+            for row in rows:
+                season_order = _season_order({
+                    "year": row.get("year"),
+                    "name": row.get("season"),
+                })
+                latest_seasons_by_year[season_order[0]] = max(
+                    latest_seasons_by_year.get(
+                        season_order[0],
+                        season_order,
+                    ),
+                    season_order,
+                )
+            latest_season_orders = set(latest_seasons_by_year.values())
+            rows = [
+                row
+                for row in rows
+                if _season_order(
+                    {"year": row.get("year"), "name": row.get("season")}
+                ) in latest_season_orders
+            ]
+        if not history_question and not year_matches and not season_phases:
             rows = rows[-6:]
         else:
             rows = rows[-24:]
 
         if not rows:
-            return "", []
+            return "", [], []
 
         lines = [
             f"Player: {player.get('full_name')} (player_id={player_id}).",
@@ -252,32 +344,55 @@ class JsonDataContext:
             if source_file:
                 sources.append(source_file)
 
-        if "match" in normalized_question or "rubber" in normalized_question:
+        if include_match_detail_note:
             lines.append(
-                "Individual player match/rubber/set results are not present in the profile JSON."
+                "Player-match data limit: season JSON `matches` entries contain "
+                "team-vs-team fixture scores; player rankings contain aggregate "
+                "totals only. Individual player opponents, rubber outcomes, and "
+                "set scores are not included."
             )
-        return "\n".join(lines), sources
+        related_team_names = list(dict.fromkeys(
+            row["team"]
+            for row in rows
+            if isinstance(row.get("team"), str) and row["team"].strip()
+        ))
+        return "\n".join(lines), sources, related_team_names
 
     def _team_sections(
         self,
-        normalized_question: str,
+        normalized_search: str,
+        normalized_selection: str,
+        related_team_names: list[str] | None = None,
     ) -> tuple[list[str], list[str]]:
+        normalized_related_names = {
+            _normalize(name) for name in related_team_names or []
+        }
         matched_team_names = [
             name for name in self.team_names
-            if len(_normalize(name)) >= 3 and _normalize(name) in normalized_question
+            if _normalize(name) in normalized_related_names
+            or (
+                len(_normalize(name)) >= 3
+                and _normalize(name) in normalized_search
+            )
         ]
         if not matched_team_names:
             return [], []
 
-        year_matches = {int(year) for year in re.findall(r"\b20\d{2}\b", normalized_question)}
+        year_matches = _season_years(normalized_selection)
+        season_phases = _season_phases(normalized_selection)
         history_question = any(
-            word in normalized_question
+            word in normalized_selection
             for word in ("history", "career", "since", "over time", "all seasons")
         )
         relevant: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
         for source_file, document in self.season_documents:
             season = document.get("season", {})
             if year_matches and season.get("year") not in year_matches:
+                continue
+            season_name = _normalize(season.get("name", ""))
+            if season_phases and not any(
+                season_name.startswith(phase) for phase in season_phases
+            ):
                 continue
             for poule_entry in document.get("poules", []):
                 poule = poule_entry.get("poule", {})
@@ -295,20 +410,37 @@ class JsonDataContext:
                 row[1].get("season", {}).get("name", ""),
             )
         )
-        if not history_question and not year_matches:
-            latest_season = max(
-                (
-                    row[1].get("season", {}).get("year", 0),
-                    row[1].get("season", {}).get("name", ""),
-                )
-                for row in relevant
-            ) if relevant else None
-            relevant = [
-                row
-                for row in relevant
-                if (row[1].get("season", {}).get("year", 0), row[1].get("season", {}).get("name", ""))
-                == latest_season
-            ]
+        if not history_question and not season_phases:
+            if year_matches:
+                latest_seasons_by_year: dict[int, tuple[int, int]] = {}
+                for row in relevant:
+                    season_order = _season_order(row[1].get("season", {}))
+                    latest_seasons_by_year[season_order[0]] = max(
+                        latest_seasons_by_year.get(
+                            season_order[0],
+                            season_order,
+                        ),
+                        season_order,
+                    )
+                latest_season_orders = set(latest_seasons_by_year.values())
+                relevant = [
+                    row
+                    for row in relevant
+                    if _season_order(row[1].get("season", {}))
+                    in latest_season_orders
+                ]
+            else:
+                latest_season = max(
+                    (
+                        _season_order(row[1].get("season", {}))
+                    )
+                    for row in relevant
+                ) if relevant else None
+                relevant = [
+                    row
+                    for row in relevant
+                    if _season_order(row[1].get("season", {})) == latest_season
+                ]
         else:
             relevant = relevant[-12:]
 
@@ -323,30 +455,61 @@ class JsonDataContext:
             ]
             standings = [
                 {
+                    "position_in_source_order": position,
                     "team": row.get("team_name"),
                     "played": row.get("played"),
                     "points": row.get("points"),
                 }
-                for row in poule_entry.get("standings", [])
+                for position, row in enumerate(poule_entry.get("standings", []), start=1)
             ]
-            matches = [
-                {
-                    "match_number": row.get("match_number"),
-                    "play_time": row.get("play_time"),
-                    "team1": row.get("team1", {}).get("name"),
-                    "team2": row.get("team2", {}).get("name"),
-                    "score1": row.get("score1"),
-                    "score2": row.get("score2"),
+            target_team_names = sorted(set(team_names).intersection(matched_team_names))
+            record_summaries = {
+                team_name: {
+                    "team": team_name,
+                    "wins": 0,
+                    "draws": 0,
+                    "losses": 0,
+                    "unplayed_fixtures": 0,
                 }
-                for row in poule_entry.get("matches", [])
-                if any(
-                    team_name in matched_team_names
-                    for team_name in (
-                        row.get("team1", {}).get("name"),
-                        row.get("team2", {}).get("name"),
-                    )
-                )
-            ][-12:]
+                for team_name in target_team_names
+            }
+            matches: list[dict[str, Any]] = []
+            for row in poule_entry.get("matches", []):
+                team1 = row.get("team1", {}).get("name")
+                team2 = row.get("team2", {}).get("name")
+                score1 = row.get("score1")
+                score2 = row.get("score2")
+                for team_name in target_team_names:
+                    if team1 == team_name:
+                        team_score, opponent_score, opponent = score1, score2, team2
+                    elif team2 == team_name:
+                        team_score, opponent_score, opponent = score2, score1, team1
+                    else:
+                        continue
+
+                    if team_score is None or opponent_score is None:
+                        result = "unplayed"
+                        record_summaries[team_name]["unplayed_fixtures"] += 1
+                    elif team_score > opponent_score:
+                        result = "win"
+                        record_summaries[team_name]["wins"] += 1
+                    elif team_score < opponent_score:
+                        result = "loss"
+                        record_summaries[team_name]["losses"] += 1
+                    else:
+                        result = "draw"
+                        record_summaries[team_name]["draws"] += 1
+
+                    matches.append({
+                        "match_number": row.get("match_number"),
+                        "play_time": row.get("play_time"),
+                        "team": team_name,
+                        "team_score": team_score,
+                        "opponent": opponent,
+                        "opponent_score": opponent_score,
+                        "result_from_team_perspective": result,
+                    })
+            matches = matches[-12:]
             section = {
                 "season": document.get("season", {}).get("name"),
                 "group": poule.get("competition"),
@@ -354,8 +517,20 @@ class JsonDataContext:
                 "poule_id": poule.get("poule_id"),
                 "source_file": source_file,
                 "teams": team_names,
+                "team_record_summaries": list(record_summaries.values()),
                 "standings": standings,
                 "matches": matches,
+                "data_warnings": (
+                    sorted({
+                        warning.get("message")
+                        for warning in poule_entry.get("warnings", [])
+                        if isinstance(warning, dict)
+                        and warning.get("code") == "MATCH_DETAILS_PENDING_PHASE_0"
+                        and isinstance(warning.get("message"), str)
+                    })
+                    if isinstance(poule_entry.get("warnings", []), list)
+                    else []
+                ),
             }
             sections.append(
                 "Team/poule records:\n"
@@ -365,3 +540,10 @@ class JsonDataContext:
                 f"{source_file} (poule {poule.get('poule_id')})"
             )
         return sections, sources
+
+
+def _season_order(season: dict[str, Any]) -> tuple[int, int]:
+    name = _normalize(str(season.get("name") or ""))
+    semester = 1 if name.startswith("najaar") else 0
+    year = season.get("year")
+    return (year if isinstance(year, int) else 0, semester)

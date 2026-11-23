@@ -196,8 +196,9 @@ function ChatPanel({
             <p className="eyebrow">GROUNDED IN YOUR LOCAL DATA</p>
             <h2>What would you like to know?</h2>
             <p>
-              Ask about a player’s season history, team standings, or a
-              comparison. I’ll use the local JSON exports and cite the source.
+              Ask about player season history, team standings, or team
+              fixtures. The current exports don’t include individual rubber
+              lineups or results. I’ll use the local JSON and cite the source.
             </p>
             <div className="suggested-questions">
               <span>Try asking</span>

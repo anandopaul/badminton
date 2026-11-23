@@ -24,3 +24,6 @@ venv/
 /api/__pycache__/
 /api/tests/__pycache__/
 .pytest_cache/
+
+# Local Rally Atlas Ollama endpoint; the WSL adapter IP can change.
+/.rally-atlas.local.json

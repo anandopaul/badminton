@@ -138,9 +138,15 @@ Vite proxies them to the backend. The backend adds the data-grounding
 instructions, limits requests to the latest 12 chat messages, and never puts
 model configuration in browser code.
 
-**Recommended with the current Windows Ollama setup:** run both Vite and
-FastAPI natively on Windows from a Windows-accessible copy of this repository.
-This keeps the frontend proxy, API, and Ollama on the same host loopback:
+The current season exports contain player ranking totals and team-vs-team
+fixture scores, but not individual rubber lineups or results. The chat can
+compare team fixtures, but it cannot identify which players a specific player
+beat or lost to.
+
+**Optional Windows-native alternative:** if using a Windows-accessible copy of
+this repository, Vite and FastAPI can both run on Windows and use Ollama's
+loopback directly. For the current Dev Container setup, follow the instructions
+below instead:
 
 ```powershell
 # Terminal 1: repository root
@@ -163,12 +169,10 @@ npm run dev
 Open `http://127.0.0.1:5173`. If the JSON files are missing, build them with
 `python3 build_player_profiles.py` from the repository root.
 
-The current Dev Container cannot reach Windows Ollama directly: its loopback is
-container-local, `host.docker.internal` does not resolve, and the tested Docker
-gateway refused port 11434. Do not bind Ollama to all interfaces to work around
-this. To keep the app containerized, a Windows portproxy can forward only the
-WSL adapter address to Ollama's existing Windows loopback listener. The address
-below is only the last value reported; recheck it after restarting WSL/Windows.
+The Dev Container reaches Windows Ollama through a portproxy bound to the WSL
+adapter address. Keep Ollama bound to Windows loopback; do not expose it on all
+network interfaces. The address below is the last verified value and can
+change after restarting WSL or Windows.
 
 From **Windows PowerShell** (read-only checks):
 
@@ -187,13 +191,17 @@ In **Ubuntu WSL**, confirm the current gateway:
 ip -4 route show default
 ```
 
-Only if the Windows WSL adapter IP and WSL gateway still match `172.17.16.1`,
-and no conflicting proxy already exists, present this command for explicit
-approval and run it in **Administrator PowerShell**:
+If the forward is missing or stale, first inspect the existing rule and confirm
+the current Windows WSL adapter IP matches the Ubuntu WSL gateway. Then, in
+**Administrator PowerShell**, set `$wslIp` and add a rule only if one for that
+address does not already exist:
 
 ```powershell
+$wslIp = Get-NetIPAddress -AddressFamily IPv4 |
+  Where-Object { $_.InterfaceAlias -match 'WSL' } |
+  Select-Object -First 1 -ExpandProperty IPAddress
 netsh interface portproxy add v4tov4 `
-  listenaddress=172.17.16.1 listenport=11434 `
+  listenaddress=$wslIp listenport=11434 `
   connectaddress=127.0.0.1 connectport=11434
 ```
 
@@ -207,8 +215,8 @@ netsh interface portproxy delete v4tov4 `
   listenaddress=172.17.16.1 listenport=11434
 ```
 
-After the forward is approved and created, test from the **Rally Atlas Dev
-Container** before setting the backend URL:
+After the forward is configured, test from the **Rally Atlas Dev Container**.
+Replace the example IP with the current WSL adapter address if it has changed:
 
 ```sh
 curl --fail --max-time 5 http://172.17.16.1:11434/api/tags
@@ -218,21 +226,58 @@ curl --fail --max-time 120 \
   http://172.17.16.1:11434/api/chat
 ```
 
-Only after both tests succeed, start FastAPI in the container with
-`OLLAMA_BASE_URL=http://172.17.16.1:11434` and
-`OLLAMA_MODEL=qwen2.5-coder:14b`; keep Vite's proxy target at
+Once the connection test succeeds, the runner below starts FastAPI with the
+configured Ollama URL and starts Vite with its proxy targeting
 `http://127.0.0.1:3001`. If no private host route works, use the Windows-native
-setup above this section or evaluate a private Compose Ollama service, which
-needs a separate model download/storage and verified GPU support.
+alternative above or separately evaluate a private Compose Ollama service,
+which needs its own model download/storage and verified GPU support.
 
 The model endpoint and model ID are backend environment variables; never add
 credentials to React code or commit local environment files. No credentials
 are required for the currently configured Ollama endpoint.
 
+### Run both Dev Container services with one command
+
+The Python runner starts FastAPI and Vite together, checks local data and
+dependencies, and verifies that the configured Ollama model is reachable. It
+does not start or change anything on Windows.
+
+One-time setup in a Dev Container terminal at the repository root:
+
+```sh
+python3 -m venv api/.venv
+api/.venv/bin/python -m pip install -r api/requirements.txt
+npm ci --prefix web
+cp .rally-atlas.local.json.example .rally-atlas.local.json
+```
+
+Edit `.rally-atlas.local.json` and set `ollama_base_url` to the current Windows
+WSL adapter address, for example `http://172.17.16.1:11434`. The local config is
+Git-ignored; update it if the address changes. If `output/player_profile.json`
+is missing, build it from the collected season files:
+
+```sh
+api/.venv/bin/python build_player_profiles.py
+```
+
+Each time you want to use Rally Atlas:
+
+```sh
+api/.venv/bin/python run_rally_atlas.py
+```
+
+Open `http://127.0.0.1:5173`. Press **Ctrl+C** in that terminal to stop both
+Dev Container servers. Ollama and the Windows portproxy stay running. To check
+the configuration without starting the web servers:
+
+```sh
+api/.venv/bin/python run_rally_atlas.py --check
+```
+
 Backend tests:
 
-```powershell
-.\api\.venv\Scripts\python.exe -m unittest discover -s api\tests -v
+```sh
+api/.venv/bin/python -m unittest discover -s api/tests -v
 ```
 
 ## Player agent
